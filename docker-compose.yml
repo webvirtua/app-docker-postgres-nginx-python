@@ -1,0 +1,46 @@
+version: '3'
+volumes:
+  dados:
+networks:
+  banco:
+  web:  
+services:
+  db:
+    image: postgres:9.6
+    volumes:
+      #volume dos dados
+      - dados:/var/lib/postgresql/data
+      #scripts
+      - /home/bob/docker-compose/email-worker-compose/scripts:/scripts
+      #executa scripts na inicialização do banco - tem na documentação
+      - /home/bob/docker-compose/email-worker-compose/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - banco #o serviço db só pertence apenas a rede banco   
+  frontend:
+    image: nginx:1.13
+    volumes:
+      #site
+      - /home/bob/docker-compose/email-worker-compose/web:/usr/share/nginx/html/
+      #configuração proxy reverso, com mapeamento de arquivo
+      - /home/bob/docker-compose/email-worker-compose/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - 80:80
+    networks:
+      #o serviço frontend só pertence apenas a rede web
+      - web
+    #serve pra duas coisas. 1° orquestrar a inicialização dos serviços, cria os que não tem dependencia e depois os outros | 2° no compose up passando o nome do serviço que quer inicializar ele inicializa o serviço e as dependencias do serviço
+    depends_on:
+      - app  
+  app:
+    image: python:3.6
+    volumes:
+      #aplicação
+      - /home/bob/docker-compose/email-worker-compose/app:/app
+    working_dir: /app
+    #tem que dar permissão de execução no arquivo ou colocar bash ./app.sh
+    command: bash ./app.sh 
+    networks:
+      - banco
+      - web 
+    depends_on:
+      - db
